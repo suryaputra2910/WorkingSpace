@@ -77,11 +77,7 @@ export default function HistoryList() {
     },
   ]
 
-  const currentYear = new Date().getFullYear()
-  const yearOptions = [
-    { value: '', label: 'Semua Tahun' },
-    ...Array.from({ length: 5 }, (_, i) => String(currentYear - i)).map((y) => ({ value: y, label: y })),
-  ]
+
 
   const monthOptions = [
     { value: '', label: 'Semua Bulan' },
@@ -100,19 +96,21 @@ export default function HistoryList() {
 
       <Card className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 border-stone/10">
         <Select
+        label="Bulan"
           name="month"
           value={filters.month}
           onChange={handleFilterChange}
           options={monthOptions}
           className="sm:w-48 bg-stone/5"
         />
-        <Select
-          name="year"
-          value={filters.year}
-          onChange={handleFilterChange}
-          options={yearOptions}
-          className="sm:w-48 bg-stone/5"
-        />
+        <Input
+  label="Tahun"
+  name="year"
+  type="number"
+  value={filters.year}
+  onChange={handleFilterChange}
+  placeholder="Contoh: 2026"
+/>
       </Card>
 
       <Card className="border-stone/10 overflow-hidden">
