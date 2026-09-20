@@ -25,3 +25,12 @@ export function isValidApiDate(value) {
 export function isValidApiTime(value) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
 }
+
+// Returns the calendar date part ("YYYY-MM-DD") of an API date or ISO
+// timestamp without going through Date (avoids timezone day shifts).
+export function toDateOnly(value) {
+  if (!value) return ''
+  if (value instanceof Date) return toApiDate(value)
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : ''
+}

@@ -86,7 +86,18 @@ export function AuthProvider({ children }) {
     const token = data?.access_token
     if (token) tokenStorage.set(token)
 
-    const profile = data?.user ?? data?.profile ?? data
+    let profile = data?.user ?? data?.profile ?? data
+
+    // The login response may not carry the member details (name, photo...).
+    // Enrich the session user from GET /api/auth/profile using the token we
+    // just stored. A failure here never fails the login itself.
+    try {
+      const fresh = unwrap(await getProfile()).data
+      if (fresh && typeof fresh === 'object') profile = { ...profile, ...fresh }
+    } catch {
+      // keep the login payload as-is
+    }
+
     setUser(profile)
     localStorage.setItem(USER_STORAGE, JSON.stringify(profile))
     return profile

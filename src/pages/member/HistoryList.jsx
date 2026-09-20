@@ -10,7 +10,7 @@ import Loading from '../../components/common/Loading.jsx'
 import ErrorState from '../../components/common/ErrorState.jsx'
 import { formatRupiah } from '../../utils/currency.js'
 import { formatDateDisplay } from '../../utils/date.js'
-import { normalizeReservasi } from '../../utils/reservasi.js'
+import { normalizeReservasiList } from '../../utils/reservasi.js'
 
 export default function HistoryList() {
   const [history, setHistory] = useState([])
@@ -30,26 +30,7 @@ export default function HistoryList() {
       if (filters.year) params.year = filters.year
 
       const res = await getMyReservasiHistory(params)
-      const body = unwrap(res)
-
-      // Robust array extraction fix.
-      console.log('HISTORY RESPONSE FULL:', JSON.stringify(body, null, 2))
-      let raw = body?.data
-
-      if (raw && !Array.isArray(raw)) {
-        // Try known keys first
-        if (Array.isArray(raw.data)) raw = raw.data
-        else if (Array.isArray(raw.reservasi)) raw = raw.reservasi
-        else if (Array.isArray(raw.history)) raw = raw.history
-        else {
-          // Generic fallback: find the first array value in the object
-          const possibleArray = Object.values(raw).find(val => Array.isArray(val))
-          raw = possibleArray || []
-        }
-      }
-
-      let list = Array.isArray(raw) ? raw : []
-      list = list.map(item => normalizeReservasi(item))
+      const list = normalizeReservasiList(unwrap(res).data)
 
       setHistory(list)
     } catch (err) {
@@ -99,8 +80,7 @@ export default function HistoryList() {
   const currentYear = new Date().getFullYear()
   const yearOptions = [
     { value: '', label: 'Semua Tahun' },
-    { value: currentYear.toString(), label: currentYear.toString() },
-    { value: (currentYear - 1).toString(), label: (currentYear - 1).toString() }
+    ...Array.from({ length: 5 }, (_, i) => String(currentYear - i)).map((y) => ({ value: y, label: y })),
   ]
 
   const monthOptions = [

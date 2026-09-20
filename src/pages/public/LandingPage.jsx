@@ -4,7 +4,7 @@ import { getSpaces } from '../../api/spaces.js'
 import { unwrap } from '../../api/axios.js'
 import Button from '../../components/ui/Button.jsx'
 import Card from '../../components/ui/Card.jsx'
-import { getImageUrl } from '../../utils/image.js'
+import SpaceImage from '../../components/common/SpaceImage.jsx'
 import { formatRupiah } from '../../utils/currency.js'
 
 export default function LandingPage() {
@@ -75,15 +75,11 @@ export default function LandingPage() {
                 <Link key={space.id} to="/login" className="group">
                   <Card hover className="h-full overflow-hidden border-stone/10 bg-paper/30 backdrop-blur-sm">
                     <div className="h-56 overflow-hidden relative bg-sand">
-                      {space.foto ? (
-                        <img
-                          src={getImageUrl(space.foto, 'spaces')}
-                          alt={space.nama_space}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-stone font-medium">Ruang Kerja</div>
-                      )}
+                      <SpaceImage
+                        space={space}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        fallback={<div className="w-full h-full flex items-center justify-center text-stone font-medium">Ruang Kerja</div>}
+                      />
                       <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-ink shadow-sm">
                         {space.tipe?.replace('_', ' ')}
                       </div>
@@ -162,9 +158,9 @@ export default function LandingPage() {
             <div className="hidden md:block absolute top-1/2 left-0 w-full h-px bg-stone/20 -translate-y-1/2 z-0" />
 
             {[
-              { step: '1', title: 'Cari Space', desc: 'Jelajahi berbagai pilihan space sesuai kebutuhan tim Anda.' },
-              { step: '2', title: 'Pilih Waktu', desc: 'Tentukan tanggal dan durasi reservasi secara real-time.' },
-              { step: '3', title: 'Mulai Bekerja', desc: 'Datang, check-in, dan langsung fokus pada pekerjaan Anda.' }
+              { step: '1', title: 'Daftar & Masuk', desc: 'Buat akun member atau daftarkan coworking Anda.' },
+              { step: '2', title: 'Pilih Space dan Waktu', desc: 'Tentukan tempat, tanggal dan durasi reservasi secara real-time.' },
+              { step: '3', title: 'Reservasi & Bayar', desc: 'Lakukan reservasi dan pembayaran.' }
             ].map((s, i) => (
               <div key={i} className="relative z-10 flex flex-col items-center text-center bg-paper px-6">
                 <div className="w-16 h-16 rounded-full bg-forest text-white flex items-center justify-center font-display text-2xl font-bold mb-6 shadow-card">

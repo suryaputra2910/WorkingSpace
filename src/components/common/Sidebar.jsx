@@ -19,9 +19,17 @@ export default function Sidebar({ items, footer, isOpen, onClose }) {
         md:relative md:translate-x-0 flex flex-col h-screen
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="h-16 flex items-center justify-between px-6 border-b border-stone/10 shrink-0">
-          <span className="font-display text-lg text-ink font-semibold tracking-tight">Ruang Kerja.</span>
-          <button onClick={onClose} className="md:hidden text-stone hover:text-ink p-1">
+        <div className="relative flex h-24 items-center justify-center border-b border-stone/10 shrink-0">
+          <img
+            src="/workingspace.png"
+            alt="logo"
+            className="h-30 w-40 object-contain"
+          />
+
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-2 text-stone transition-colors hover:bg-stone/10 hover:text-ink md:hidden"
+          >
             <X size={20} />
           </button>
         </div>
@@ -46,7 +54,11 @@ export default function Sidebar({ items, footer, isOpen, onClose }) {
           ))}
         </nav>
 
-        {footer && <div className="p-4 border-t border-stone/10 bg-cream/30 shrink-0">{footer}</div>}
+        {footer && (
+          <div className="mt-auto border-t border-stone/10 bg-cream/30 p-4 shrink-0">
+            {footer}
+          </div>
+        )}
       </aside>
     </>
   )

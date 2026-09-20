@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getAdminReservasi as getReservasi } from '../../api/reservasi.js'
+import { fetchAllAdminReservasi } from '../../api/reservasi.js'
 import { getSpaces } from '../../api/spaces.js'
 import { getMembersList as getMembers } from '../../api/members.js'
 import { unwrap, getErrorMessage } from '../../api/axios.js'
@@ -12,6 +12,7 @@ import StatusBadge from '../../components/ui/Badge.jsx'
 import { formatRupiah } from '../../utils/currency.js'
 import { formatDateDisplay } from '../../utils/date.js'
 import { normalizeReservasi } from '../../utils/reservasi.js'
+import { REALIZED_STATUS } from '../../utils/report.js'
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -19,32 +20,43 @@ export default function AdminDashboard() {
 
   const loadData = async () => {
     setState(s => ({ ...s, loading: true, error: null }))
+
     try {
-      const [resReq, spaceReq, memberReq] = await Promise.all([
-        getReservasi({ limit: 10 }), // get recent 10
+      const [rows, spaceReq, memberReq] = await Promise.all([
+        fetchAllAdminReservasi(),
         getSpaces(),
         getMembers()
       ])
 
-      let rawRes = unwrap(resReq).data
-      if (rawRes && !Array.isArray(rawRes)) {
-        if (Array.isArray(rawRes.data)) rawRes = rawRes.data
-        else if (Array.isArray(rawRes.reservasi)) rawRes = rawRes.reservasi
-        else {
-          const arr = Object.values(rawRes).find(v => Array.isArray(v))
-          rawRes = arr || []
-        }
-      }
+      const reservasi = rows
+        .map(normalizeReservasi)
+        .filter(Boolean)
+        .sort((a, b) => Number(b.id) - Number(a.id))
+
+      const spaceData = unwrap(spaceReq).data
+      const memberData = unwrap(memberReq).data
 
       setState({
         loading: false,
         error: null,
-        reservasi: (Array.isArray(rawRes) ? rawRes : []).map(normalizeReservasi),
-        spaces: unwrap(spaceReq).data ?? [],
-        members: unwrap(memberReq).data ?? [],
+        reservasi,
+        spaces: Array.isArray(spaceData)
+          ? spaceData
+          : Array.isArray(spaceData?.data)
+            ? spaceData.data
+            : [],
+        members: Array.isArray(memberData)
+          ? memberData
+          : Array.isArray(memberData?.data)
+            ? memberData.data
+            : [],
       })
     } catch (err) {
-      setState(s => ({ ...s, loading: false, error: getErrorMessage(err) }))
+      setState(s => ({
+        ...s,
+        loading: false,
+        error: getErrorMessage(err)
+      }))
     }
   }
 
@@ -56,9 +68,40 @@ export default function AdminDashboard() {
   const spacesArr = Array.isArray(state.spaces) ? state.spaces : []
   const membersArr = Array.isArray(state.members) ? state.members : []
   const activeReservasi = state.reservasi.filter(r => ['belum_dikonfirm', 'disetujui', 'aktif'].includes(r.status))
+  // Realised income only counts reservations with status "selesai".
   const totalRevenue = state.reservasi
-    .filter(r => ['disetujui', 'aktif', 'selesai'].includes(r.status))
-    .reduce((sum, r) => sum + (Number(r.total_bayar) || 0), 0)
+    .filter(r => r.status === REALIZED_STATUS)
+    .reduce((sum, r) => sum + (typeof r.total_bayar === 'number' ? r.total_bayar : 0), 0)
+  const getSpaceForReservation = (reservation) => {
+    const detail = reservation.detail_reservasi?.[0]
+
+    const spaceId =
+      reservation.id_space ??
+      detail?.id_space ??
+      detail?.space?.id
+
+    const spaceName =
+      reservation.nama_space ??
+      detail?.space?.nama_space ??
+      detail?.nama_space
+
+    return spacesArr.find((space) => {
+      if (spaceId != null && Number(space.id) === Number(spaceId)) {
+        return true
+      }
+
+      if (
+        spaceName &&
+        space.nama_space &&
+        space.nama_space.trim().toLowerCase() ===
+        spaceName.trim().toLowerCase()
+      ) {
+        return true
+      }
+
+      return false
+    })
+  }
 
   return (
     <div className="space-y-8">
@@ -72,7 +115,7 @@ export default function AdminDashboard() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: 'Total Reservasi Aktif', value: activeReservasi.length, icon: '📅', color: 'bg-forest' },
-          { label: 'Total Pendapatan', value: formatRupiah(totalRevenue), icon: '💰', color: 'bg-clay' },
+          { label: 'Pendapatan Realisasi', value: formatRupiah(totalRevenue), icon: '💰', color: 'bg-clay' },
           { label: 'Space Terdaftar', value: spacesArr.length, icon: '🏢', color: 'bg-stone' },
           { label: 'Total Member', value: membersArr.length, icon: '👥', color: 'bg-ink' },
         ].map((kpi, i) => (
@@ -91,6 +134,7 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-display text-xl font-semibold text-ink">Reservasi Terbaru</h3>
+
             <Link to="/admin/reservasi" className="text-sm font-medium text-forest hover:text-moss">
               Lihat Semua
             </Link>
@@ -103,17 +147,18 @@ export default function AdminDashboard() {
               <div className="divide-y divide-stone/10">
                 {state.reservasi.slice(0, 5).map(r => (
                   <div key={r.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-stone/5 transition-colors">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-full bg-sand/50 flex items-center justify-center text-stone font-medium shrink-0">
-                        {(r.member?.nama_member || 'M').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-ink line-clamp-1">{r.nama_space || 'Space'}</p>
-                        <p className="text-xs text-stone mt-1">{r.member?.nama_member || 'Member'}</p>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-stone">
-                          <span>{formatDateDisplay(r.tanggal_reservasi)}</span>
-                          <span>{r.jam_mulai}</span>
-                        </div>
+                    <div>
+                      <p className="font-medium text-ink line-clamp-1">
+                        {r.nama_space || 'Space'}
+                      </p>
+
+                      <p className="text-xs text-stone mt-1">
+                        {r.nama_member || 'Member'}
+                      </p>
+
+                      <div className="flex items-center gap-3 mt-2 text-xs text-stone">
+                        <span>{formatDateDisplay(r.tanggal_reservasi)}</span>
+                        <span>{r.jam_mulai}</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 shrink-0">

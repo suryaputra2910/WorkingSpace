@@ -8,6 +8,7 @@ import Loading from '../../components/common/Loading.jsx'
 import ErrorState from '../../components/common/ErrorState.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import { formatDateDisplay } from '../../utils/date.js'
+import { normalizeReservasiList } from '../../utils/reservasi.js'
 
 export default function ReservasiList() {
   const [reservasi, setReservasi] = useState([])
@@ -19,8 +20,8 @@ export default function ReservasiList() {
     setError(null)
     try {
       const res = await getMyReservasi()
-      const raw = unwrap(res).data
-      setReservasi(Array.isArray(raw) ? raw : [])
+      // Same normalizer as History / Detail / Admin so the data stays consistent.
+      setReservasi(normalizeReservasiList(unwrap(res).data))
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -40,7 +41,7 @@ export default function ReservasiList() {
     return (
       <EmptyState
         title="Belum ada reservasi aktif"
-        description="Anda belum membuat reservasi, atau semua reservasi telah selesai/dibatalkan."
+        description="Anda belum membuat reservasi"
         action={<Link to="/member/spaces" className="inline-block px-5 py-2.5 bg-forest text-white rounded-md text-sm font-medium hover:bg-moss transition-colors">Pesan Space Sekarang</Link>}
       />
     )
@@ -67,7 +68,7 @@ export default function ReservasiList() {
 
                   <div>
                     <h3 className="font-display text-xl font-semibold text-ink group-hover:text-gray-600 transition-colors mb-1">
-                      {r.detail_reservasi?.[0]?.space?.nama_space || r.space_nama || r.nama_space || 'Space'}
+                      {r.nama_space || 'Space'}
                     </h3>
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-stone mt-2">
                       <span className="flex items-center gap-1.5">

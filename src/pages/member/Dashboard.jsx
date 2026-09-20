@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getMyReservasi, getMyReservasiHistory } from '../../api/reservasi.js'
+import { getMyReservasi } from '../../api/reservasi.js'
 import { getSpaces } from '../../api/spaces.js'
 import { unwrap, getErrorMessage } from '../../api/axios.js'
 import Card from '../../components/ui/Card.jsx'
@@ -10,25 +10,25 @@ import ErrorState from '../../components/common/ErrorState.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 import StatusBadge from '../../components/ui/Badge.jsx'
 import { formatDateDisplay } from '../../utils/date.js'
-import { getImageUrl } from '../../utils/image.js'
+import SpaceImage from '../../components/common/SpaceImage.jsx'
+import { normalizeReservasiList } from '../../utils/reservasi.js'
+import { getDisplayName } from '../../utils/profile.js'
 
 export default function MemberDashboard() {
   const { user } = useAuth()
-  const [state, setState] = useState({ loading: true, error: null, reservasiAktif: [], history: [], spaces: [] })
+  const [state, setState] = useState({ loading: true, error: null, reservasiAktif: [], spaces: [] })
 
   const loadData = async () => {
     setState((s) => ({ ...s, loading: true, error: null }))
     try {
-      const [aktifRes, historyRes, spacesRes] = await Promise.all([
+      const [aktifRes, spacesRes] = await Promise.all([
         getMyReservasi(),
-        getMyReservasiHistory(),
         getSpaces(),
       ])
       setState({
         loading: false,
         error: null,
-        reservasiAktif: unwrap(aktifRes).data ?? [],
-        history: unwrap(historyRes).data ?? [],
+        reservasiAktif: normalizeReservasiList(unwrap(aktifRes).data),
         spaces: unwrap(spacesRes).data ?? [],
       })
     } catch (error) {
@@ -60,10 +60,14 @@ export default function MemberDashboard() {
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-display text-3xl font-semibold text-ink mb-1 tracking-tight">
-            {getGreeting()}, {user?.nama_member?.split(' ')[0] || user?.username || 'Member'} 👋
+          <h2 className="text-3xl font-semibold text-ink mb-1 tracking-tight">
+            {getGreeting()},{' '}
+            {(getDisplayName(user).split(' ')[0] || 'Member')
+              .charAt(0)
+              .toUpperCase() +
+              (getDisplayName(user).split(' ')[0] || 'Member').slice(1)}
           </h2>
-          <p className="text-stone">Mari tingkatkan produktivitas Anda hari ini.</p>
+          <p className="text-stone">Mari tingkatkan produktivitas Anda hari ini</p>
         </div>
       </div>
 
@@ -121,7 +125,7 @@ export default function MemberDashboard() {
                     </div>
 
                     <h4 className="font-display text-lg font-semibold text-ink mb-1 line-clamp-1">
-                      {r.detail_reservasi?.[0]?.space?.nama_space || r.space_nama || r.nama_space || 'Space'}
+                      {r.nama_space || 'Space'}
                     </h4>
                     <p className="text-sm text-stone flex items-center gap-2 mt-3">
                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -157,11 +161,11 @@ export default function MemberDashboard() {
               <Link key={space.id} to={`/member/spaces/${space.id}`} className="group block h-full">
                 <Card hover className="h-full overflow-hidden">
                   <div className="h-32 bg-sand overflow-hidden">
-                    {space.foto ? (
-                      <img src={getImageUrl(space.foto, 'spaces')} alt={space.nama_space} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-stone text-xs">Ruang Kerja</div>
-                    )}
+                    <SpaceImage
+                      space={space}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      fallback={<div className="w-full h-full flex items-center justify-center text-stone text-xs">Ruang Kerja</div>}
+                    />
                   </div>
                   <div className="p-4">
                     <p className="font-display font-medium text-ink line-clamp-1">{space.nama_space}</p>

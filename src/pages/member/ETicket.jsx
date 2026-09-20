@@ -7,10 +7,15 @@ import Loading from '../../components/common/Loading.jsx'
 import ErrorState from '../../components/common/ErrorState.jsx'
 import { formatRupiah } from '../../utils/currency.js'
 import { formatDateDisplay } from '../../utils/date.js'
+import { normalizeReservasi } from '../../utils/reservasi.js'
+import StatusBadge from '../../components/ui/Badge.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { getDisplayName } from '../../utils/profile.js'
 
 export default function ETicket() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -21,8 +26,8 @@ export default function ETicket() {
     try {
       const res = await getReservasiById(id)
       const raw = unwrap(res).data
-      // handle nested 'reservasi' if present
-      setData(raw?.reservasi || raw)
+      // Same normalizer as every other reservation screen (handles nested 'reservasi').
+      setData(normalizeReservasi(raw))
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -72,7 +77,7 @@ export default function ETicket() {
         {/* Ticket Body: Details */}
         <div className="p-8 space-y-8 bg-white">
           <div className="text-center pb-8 border-b border-stone/10">
-            <h2 className="font-display text-3xl font-bold text-ink">{data.detail_reservasi?.[0]?.space?.nama_space || data.space_nama || data.nama_space || 'Space'}</h2>
+            <h2 className="font-display text-3xl font-bold text-ink">{data.nama_space || 'Space'}</h2>
             <p className="text-sm text-stone mt-2">Nomor Reservasi: <span className="font-mono text-ink font-medium">#{data.id}</span></p>
           </div>
 
@@ -93,37 +98,28 @@ export default function ETicket() {
               <span className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">Check Out</span>
               <span className="font-medium text-ink">{data.jam_selesai || '-'}</span>
             </div>
+            <div className="col-span-2">
+              <span className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">Total Bayar</span>
+              <span className="font-medium text-ink">{formatRupiah(data.total_bayar)}</span>
+            </div>
           </div>
 
           {/* User & Status */}
           <div className="bg-sand/30 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
             <div>
               <span className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">Dipesan Oleh</span>
-              <span className="font-medium text-ink">{data.member?.nama_member || 'Member'}</span>
+              <span className="font-medium text-ink">{data.nama_member || getDisplayName(user) || 'Member'}</span>
             </div>
             <div>
               <span className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">Status Reservasi</span>
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${data.status === 'disetujui' || data.status === 'aktif' ? 'bg-forest/10 text-forest' :
-                  data.status === 'selesai' ? 'bg-stone/10 text-stone' : 'bg-clay/10 text-clay'
-                }`}>
-                {data.status}
-              </span>
+<StatusBadge status={data.status} />
             </div>
           </div>
         </div>
 
-        {/* Ticket Bottom: QR/Barcode Area (Mock) */}
+        {/* Ticket Bottom */}
         <div className="bg-cream/30 p-8 border-t border-stone/10 text-center">
-          <div className="h-16 w-3/4 max-w-[240px] mx-auto bg-stone/20 rounded-sm mb-3 flex items-center justify-center relative overflow-hidden">
-            {/* Mock barcode lines */}
-            <div className="absolute inset-y-0 w-full flex justify-between px-2 opacity-50">
-              {[...Array(30)].map((_, i) => (
-                <div key={i} className={`h-full bg-ink ${i % 3 === 0 ? 'w-1' : i % 2 === 0 ? 'w-0.5' : 'w-1.5'}`} />
-              ))}
-            </div>
-          </div>
-          <p className="text-xs text-stone font-mono tracking-widest">{data.id}-{data.tanggal_reservasi?.replace(/-/g, '')}</p>
-          <p className="text-[10px] text-stone mt-4 max-w-xs mx-auto">Tunjukkan e-ticket ini kepada resepsionis atau scan di kiosk saat kedatangan.</p>
+          <p className="text-[10px] text-stone max-w-xs mx-auto">Tunjukkan e-ticket ini kepada resepsionis saat kedatangan.</p>
         </div>
       </div>
     </div>

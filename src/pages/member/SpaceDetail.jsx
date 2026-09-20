@@ -10,8 +10,8 @@ import Input from '../../components/ui/Input.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorState from '../../components/common/ErrorState.jsx'
-import { formatRupiah } from '../../utils/currency.js'
-import { getImageUrl } from '../../utils/image.js'
+import { formatRupiah, toNumber } from '../../utils/currency.js'
+import SpaceImage from '../../components/common/SpaceImage.jsx'
 import { isValidApiDate, isValidApiTime, formatDateDisplay } from '../../utils/date.js'
 import { normalizeReservasi } from '../../utils/reservasi.js'
 
@@ -52,29 +52,129 @@ export default function SpaceDetail() {
     setAvailability(null)
   }
 
-  const handleCheckAvailability = async () => {
+  // Validates the booking form; returns an { field: message } map.
+  const validateBookingForm = () => {
     const errs = {}
     if (!isValidApiDate(form.tanggal_reservasi)) errs.tanggal_reservasi = 'Pilih tanggal (YYYY-MM-DD)'
     if (!isValidApiTime(form.jam_mulai)) errs.jam_mulai = 'Pilih jam (HH:mm)'
-    if (Number(form.durasi_jam) < 1) errs.durasi_jam = 'Minimal 1 jam'
-    setFormErrors(errs)
-    if (Object.keys(errs).length > 0) return
-
-    setCheckingAvailability(true)
-    try {
-      const res = await getSpaceAvailability({
-        id_space: id,
-        tanggal_reservasi: form.tanggal_reservasi,
-        jam_mulai: form.jam_mulai,
-        durasi_jam: form.durasi_jam,
-      })
-      setAvailability(unwrap(res).data)
-    } catch (err) {
-      setAvailability({ tersedia: false, message: getErrorMessage(err) })
-    } finally {
-      setCheckingAvailability(false)
-    }
+    if (!(Number(form.durasi_jam) >= 1)) errs.durasi_jam = 'Minimal 1 jam'
+    return errs
   }
+
+const handleCheckAvailability = async () => {
+  const errs = validateBookingForm()
+  setFormErrors(errs)
+
+  if (Object.keys(errs).length > 0) return
+
+  setCheckingAvailability(true)
+
+  try {
+    const res = await getSpaceAvailability({
+      id_space: Number(id),
+      tanggal_reservasi: form.tanggal_reservasi,
+      jam_mulai: form.jam_mulai,
+      durasi_jam: Number(form.durasi_jam),
+    })
+
+    const data = unwrap(res).data
+
+    console.log(
+      'AVAILABILITY FULL:',
+      JSON.stringify(data, null, 2)
+    )
+
+    const space = Array.isArray(data)
+      ? data.find((item) => Number(item.id) === Number(id))
+      : null
+
+    if (!space) {
+      setAvailability({
+        tersedia: false,
+        message: 'Data ketersediaan space tidak ditemukan.',
+      })
+      return
+    }
+
+    const requestedDate = form.tanggal_reservasi
+    const requestedStart = form.jam_mulai
+    const requestedDuration = Number(form.durasi_jam)
+
+    const requestedStartMinutes = (() => {
+      const [hour, minute] = requestedStart.split(':').map(Number)
+      return hour * 60 + minute
+    })()
+
+    const requestedEndMinutes =
+      requestedStartMinutes + requestedDuration * 60
+
+    const activeBookings = (space.detail_reservasi || []).filter(
+      (detail) => {
+        const reservation = detail?.reservasi
+
+        if (!reservation) return false
+
+        // Reservasi yang sudah dibatalkan tidak dianggap bentrok.
+        if (reservation.status === 'dibatalkan') return false
+
+        const reservationDate =
+          reservation.tanggal_reservasi?.slice(0, 10)
+
+        if (reservationDate !== requestedDate) return false
+
+        const [hour, minute] = reservation.jam_mulai
+          .split(':')
+          .map(Number)
+
+        const reservationStart = hour * 60 + minute
+        const reservationEnd =
+          reservationStart + Number(reservation.durasi_jam) * 60
+
+        // Cek apakah kedua rentang waktu saling overlap.
+        return (
+          requestedStartMinutes < reservationEnd &&
+          requestedEndMinutes > reservationStart
+        )
+      }
+    )
+if (activeBookings.length > 0) {
+  const booking = activeBookings[0].reservasi
+
+  const [hour, minute] = booking.jam_mulai.split(':').map(Number)
+
+  const startMinutes = hour * 60 + minute
+  const endMinutes =
+    startMinutes + Number(booking.durasi_jam) * 60
+
+  const endHour = Math.floor(endMinutes / 60) % 24
+  const endMinute = endMinutes % 60
+
+  const endTime =
+    `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`
+
+  setAvailability({
+    tersedia: false,
+    message:
+      `Space sudah terbooking hingga pukul ${endTime}. ` +
+      `Silakan pilih waktu lain.`,
+  })
+
+  return
+}
+
+    setAvailability({
+      tersedia: true,
+      message: 'Space tersedia dan siap dipesan.',
+    })
+  } catch (err) {
+    setAvailability({
+      tersedia: false,
+      message: getErrorMessage(err),
+    })
+  } finally {
+    setCheckingAvailability(false)
+  }
+}
 
   const handleCheckPromo = async () => {
     if (!form.kode_promo) return
@@ -98,6 +198,16 @@ export default function SpaceDetail() {
   }
 
   const handleBook = async () => {
+    // Validate BEFORE calling the API. Previously an empty form was sent as-is,
+    // the API answered with a validation-error payload and that payload (an
+    // array/object) was handed to toast()/JSX, crashing React into a white screen.
+    const errs = validateBookingForm()
+    setFormErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      toast.error('Lengkapi tanggal, jam mulai, dan durasi terlebih dahulu.')
+      return
+    }
+
     setIsBooking(true)
     try {
       const payload = {
@@ -110,10 +220,16 @@ export default function SpaceDetail() {
       if (form.kode_promo) payload.kode_promo = form.kode_promo
 
       const res = await createReservasi(payload)
-      const raw = unwrap(res).data
-      const created = normalizeReservasi(raw?.reservasi || raw)
-      toast.success(raw?.message || 'Reservasi berhasil dibuat!')
-      setBookingResult(created)
+      const { data: raw, message } = unwrap(res)
+      const created = normalizeReservasi(raw)
+      toast.success(typeof message === 'string' && message ? message : 'Reservasi berhasil dibuat!')
+
+      if (created) {
+        setBookingResult(created)
+      } else {
+        // Unexpected payload: the booking itself succeeded, so don't leave the user hanging.
+        navigate('/member/reservasi')
+      }
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -130,10 +246,10 @@ export default function SpaceDetail() {
   if (error) return <ErrorState message={error} onRetry={loadSpace} />
   if (!space) return null
 
-  const hargaPerJam = space.harga_per_jam || 0
+  const hargaPerJam = toNumber(space.harga_per_jam) ?? 0
   const durasi = Number(form.durasi_jam) || 0
   const totalAwal = hargaPerJam * durasi
-  const persentaseDiskon = promo?.persentase_diskon ?? 0
+  const persentaseDiskon = toNumber(promo?.persentase_diskon) ?? 0
   const estimasiPotongan = persentaseDiskon > 0 ? Math.round(totalAwal * persentaseDiskon / 100) : 0
   const estimasiTotalBayar = Math.max(totalAwal - estimasiPotongan, 0)
 
@@ -152,7 +268,7 @@ export default function SpaceDetail() {
               <span>Waktu</span><span className="font-medium text-ink">{formatDateDisplay(bookingResult.tanggal_reservasi)} · {bookingResult.jam_mulai}</span>
             </div>
             <div className="flex justify-between items-center text-stone">
-              <span>Durasi</span><span className="font-medium text-ink">{bookingResult.durasi_jam || durasi} jam</span>
+              <span>Durasi</span><span className="font-medium text-ink">{bookingResult.durasi_jam ?? durasi} jam</span>
             </div>
             {(bookingResult.potongan_diskon > 0) && (
               <div className="flex justify-between items-center text-forest">
@@ -177,11 +293,10 @@ export default function SpaceDetail() {
       {/* Left Column: Details */}
       <div className="lg:col-span-7 xl:col-span-8 space-y-8">
         <div className="rounded-2xl overflow-hidden bg-sand aspect-video relative">
-          {space.foto ? (
-            <img src={getImageUrl(space.foto, 'spaces')} alt={space.nama_space} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-stone">Tidak ada foto</div>
-          )}
+          <SpaceImage
+            space={space}
+            fallback={<div className="w-full h-full flex items-center justify-center text-stone">Tidak ada foto</div>}
+          />
           <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider text-ink shadow-sm">
             {space.tipe?.replace('_', ' ')}
           </div>
@@ -238,7 +353,7 @@ export default function SpaceDetail() {
                     : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   }
                 </svg>
-                <span>{availability?.message || (availability?.tersedia === false ? 'Space tidak tersedia pada waktu ini.' : 'Space tersedia dan siap dipesan.')}</span>
+                <span>{(typeof availability?.message === 'string' && availability.message) || (availability?.tersedia === false ? 'Space tidak tersedia pada waktu ini.' : 'Space tersedia dan siap dipesan.')}</span>
               </div>
             )}
           </div>

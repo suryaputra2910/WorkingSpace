@@ -22,9 +22,9 @@ export default function Button({
 
   return (
     <button
+      {...props}
       className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
       disabled={isLoading || props.disabled}
-      {...props}
     >
       {isLoading && (
         <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />

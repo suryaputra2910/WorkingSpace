@@ -8,6 +8,9 @@ import Button from '../../components/ui/Button.jsx'
 import Input from '../../components/ui/Input.jsx'
 import Card from '../../components/ui/Card.jsx'
 import Loading from '../../components/common/Loading.jsx'
+import Avatar from '../../components/common/Avatar.jsx'
+import { normalizeMember } from '../../utils/profile.js'
+import { extractList } from '../../utils/reservasi.js'
 import ErrorState from '../../components/common/ErrorState.jsx'
 import ConfirmDialog from '../../components/modal/ConfirmDialog.jsx'
 
@@ -26,8 +29,8 @@ export default function Members() {
     setError(null)
     try {
       const res = await getMembers()
-      const raw = unwrap(res).data
-      setMembers(Array.isArray(raw) ? raw : [])
+      // Foto field is read from the real response (foto / nested member.foto).
+      setMembers(extractList(unwrap(res).data).map(normalizeMember).filter(Boolean))
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -66,9 +69,7 @@ export default function Members() {
       header: 'Informasi Member',
       render: (m) => (
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-sand flex items-center justify-center text-stone text-xs font-medium">
-            {(m.nama_member || 'M').charAt(0).toUpperCase()}
-          </div>
+          <Avatar foto={m.foto} name={m.nama_member || m.username} type="members" className="w-9 h-9 text-xs" />
           <div>
             <div className="font-medium text-ink">{m.nama_member}</div>
             <div className="text-xs text-stone mt-0.5">@{m.username}</div>
@@ -101,12 +102,17 @@ export default function Members() {
           <h2 className="font-display text-3xl font-semibold text-ink mb-1">Kelola Member</h2>
           <p className="text-stone">Daftar pengguna yang terdaftar di coworking space Anda.</p>
         </div>
-        <div className="w-full sm:w-64">
-          <Input
-            placeholder="Cari nama atau username..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div className="flex w-full sm:w-auto items-center gap-3">
+          <div className="flex-1 sm:w-64">
+            <Input
+              placeholder="Cari nama atau username..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <Link to="/admin/members/new">
+            <Button variant="primary" className="whitespace-nowrap">Tambah Member</Button>
+          </Link>
         </div>
       </div>
 

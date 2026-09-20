@@ -10,7 +10,7 @@ import Loading from '../../components/common/Loading.jsx'
 import ErrorState from '../../components/common/ErrorState.jsx'
 import ConfirmDialog from '../../components/modal/ConfirmDialog.jsx'
 import { formatRupiah } from '../../utils/currency.js'
-import { getImageUrl } from '../../utils/image.js'
+import SpaceImage from '../../components/common/SpaceImage.jsx'
 
 export default function Spaces() {
   const [spaces, setSpaces] = useState([])
@@ -62,11 +62,10 @@ export default function Spaces() {
       render: (s) => (
         <div className="flex items-center gap-4 py-1">
           <div className="w-12 h-12 rounded-md bg-sand overflow-hidden shrink-0">
-            {s.foto ? (
-              <img src={getImageUrl(s.foto, 'spaces')} alt={s.nama_space} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-stone text-[10px] font-medium">No Image</div>
-            )}
+            <SpaceImage
+              space={s}
+              fallback={<div className="w-full h-full flex items-center justify-center text-stone text-[10px] font-medium">No Image</div>}
+            />
           </div>
           <div>
             <div className="font-medium text-ink">{s.nama_space}</div>

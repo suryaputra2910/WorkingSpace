@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { getSpaces, getSpaceTypes } from '../../api/spaces.js'
+import { getSpaces } from '../../api/spaces.js'
 import { unwrap, getErrorMessage } from '../../api/axios.js'
 
 import Card from '../../components/ui/Card.jsx'
@@ -11,7 +11,7 @@ import ErrorState from '../../components/common/ErrorState.jsx'
 import EmptyState from '../../components/common/EmptyState.jsx'
 
 import { formatRupiah } from '../../utils/currency.js'
-import { getImageUrl } from '../../utils/image.js'
+import SpaceImage from '../../components/common/SpaceImage.jsx'
 
 export default function SpaceList() {
   const [spaces, setSpaces] = useState([])
@@ -20,16 +20,6 @@ export default function SpaceList() {
   const [tipe, setTipe] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
-  const loadTypes = async () => {
-    try {
-      const res = await getSpaceTypes()
-      const raw = unwrap(res).data
-      setTypes(Array.isArray(raw) ? raw : [])
-    } catch {
-      // Non-critical
-    }
-  }
 
   const loadSpaces = async () => {
     setLoading(true)
@@ -57,10 +47,6 @@ export default function SpaceList() {
   }
 
   useEffect(() => {
-    loadTypes()
-  }, [])
-
-  useEffect(() => {
     const timeout = setTimeout(loadSpaces, 300)
 
     return () => clearTimeout(timeout)
@@ -68,17 +54,20 @@ export default function SpaceList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, tipe])
 
-  const typeOptions = (Array.isArray(types) ? types : []).map((t) =>
-    typeof t === 'string'
-      ? {
-          value: t,
-          label: t.replace('_', ' '),
-        }
-      : {
-          value: t.value,
-          label: t.label,
-        }
-  )
+const typeOptions = [
+  {
+    value: 'desk',
+    label: 'Desk',
+  },
+  {
+    value: 'meeting_room',
+    label: 'Meeting Room',
+  },
+  {
+    value: 'private_office',
+    label: 'Private Office',
+  },
+]
 
   return (
     <div className="space-y-8">
@@ -149,8 +138,6 @@ export default function SpaceList() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {spaces.map((space) => {
-            const image = getImageUrl(space.foto)
-
             return (
               <Link
                 key={space.id}
@@ -160,13 +147,14 @@ export default function SpaceList() {
                 <Card className="h-full overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
                   {/* Image */}
                   <div className="relative aspect-[16/10] overflow-hidden bg-stone-100">
-                    {image ? (
-                      <img src={getImageUrl(space.foto, 'spaces')} alt={space.nama_space} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-sm text-stone">
-                        Tidak ada gambar
-                      </div>
-                    )}
+                    <SpaceImage
+                      space={space}
+                      fallback={
+                        <div className="flex h-full items-center justify-center text-sm text-stone">
+                          Tidak ada gambar
+                        </div>
+                      }
+                    />
 
                     <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-ink backdrop-blur-sm">
                       {space.tipe}

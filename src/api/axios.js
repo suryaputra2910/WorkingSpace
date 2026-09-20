@@ -5,9 +5,6 @@ import axios from 'axios'
 // so no other file should ever read/write localStorage for these values directly.
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 const APP_KEY_STORAGE = 'coworking_app_key'
@@ -80,12 +77,31 @@ export function unwrap(response) {
   }
 }
 
+// Converts any API `message` shape into a plain string. NestJS validation
+// errors arrive as an array (sometimes of objects); passing those straight to
+// a toast/JSX makes React throw "Objects are not valid as a React child",
+// which unmounts the whole tree and leaves a white screen.
+function messageToString(m) {
+  if (m === null || m === undefined) return ''
+  if (typeof m === 'string') return m
+  if (Array.isArray(m)) return m.map(messageToString).filter(Boolean).join(', ')
+  if (typeof m === 'object') {
+    if (typeof m.message === 'string') return m.message
+    if (m.errors !== undefined) return messageToString(m.errors)
+    if (m.constraints && typeof m.constraints === 'object') return messageToString(Object.values(m.constraints))
+    try { return JSON.stringify(m) } catch { return '' }
+  }
+  return String(m)
+}
+
 // Helper to extract a friendly error message from the standard error envelope:
-// { status, statusCode, message, error, timestamp }
+// { status, statusCode, message, error, timestamp }. Always returns a string.
 export function getErrorMessage(error) {
   const body = error?.response?.data
-  if (body?.message) return body.message
-  if (error?.message) return error.message
+  const fromBody = messageToString(body?.message) || messageToString(body?.error)
+  if (fromBody) return fromBody
+  const fromError = messageToString(error?.message)
+  if (fromError) return fromError
   return 'Terjadi kesalahan yang tidak diketahui.'
 }
 

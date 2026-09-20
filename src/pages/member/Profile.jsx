@@ -7,7 +7,8 @@ import { unwrap, getErrorMessage } from '../../api/axios.js'
 import Card from '../../components/ui/Card.jsx'
 import Input from '../../components/ui/Input.jsx'
 import Loading from '../../components/common/Loading.jsx'
-import { getImageUrl } from '../../utils/image.js'
+import Avatar from '../../components/common/Avatar.jsx'
+import { normalizeProfile } from '../../utils/profile.js'
 
 export default function MemberProfile() {
   const [form, setForm] = useState({
@@ -24,19 +25,18 @@ export default function MemberProfile() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        // GET /api/auth/profile -> the member that is currently logged in.
         const res = await getProfile()
-        const data = unwrap(res).data
+        const p = normalizeProfile(unwrap(res).data)
 
-        if (data) {
-          setForm({
-            nama_member: data.member?.nama_member || '',
-            username: data.username || '',
-            instansi: data.member?.instansi || '',
-            alamat: data.member?.alamat || '',
-            telp: data.member?.telp || '',
-            foto_profil: data.member?.foto || '',
-          })
-        }
+        setForm({
+          nama_member: p.nama,
+          username: p.username,
+          instansi: p.instansi,
+          alamat: p.alamat,
+          telp: p.telp,
+          foto_profil: p.foto,
+        })
       } catch (err) {
         toast.error(getErrorMessage(err))
       } finally {
@@ -51,9 +51,7 @@ export default function MemberProfile() {
     return <Loading />
   }
 
-  const avatarUrl = getImageUrl(form.foto_profil, 'members')
   const displayName = form.nama_member || form.username || ''
-  const initial = displayName ? displayName.charAt(0).toUpperCase() : ''
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -73,19 +71,13 @@ export default function MemberProfile() {
           {/* Foto & Nama Member */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
             <div className="shrink-0">
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-sand border-4 border-white shadow-soft">
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={displayName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-3xl font-display text-stone">
-                    {initial}
-                  </div>
-                )}
-              </div>
+              <Avatar
+                foto={form.foto_profil}
+                name={displayName}
+                type="members"
+                className="w-24 h-24 border-4 border-white shadow-soft"
+                textClassName="text-3xl font-display"
+              />
             </div>
 
             <div className="text-center sm:text-left">

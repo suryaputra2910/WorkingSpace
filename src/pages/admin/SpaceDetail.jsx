@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { getSpaceById, createSpace, updateSpace } from '../../api/spaces.js'
-import { uploadSpaceImage } from '../../api/upload.js'
 import { unwrap, getErrorMessage } from '../../api/axios.js'
 import Card from '../../components/ui/Card.jsx'
 import Input from '../../components/ui/Input.jsx'
@@ -10,18 +9,21 @@ import Select from '../../components/ui/Select.jsx'
 import Button from '../../components/ui/Button.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorState from '../../components/common/ErrorState.jsx'
-import { getImageUrl } from '../../utils/image.js'
+import PhotoPicker from '../../components/ui/PhotoPicker.jsx'
+import { pickSpacePhoto } from '../../utils/image.js'
 
 export default function SpaceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isNew = id === 'new'
-  const fileInputRef = useRef(null)
+  // A file that was already uploaded successfully is remembered so that a retry
+  // after a failed save does not upload the same photo twice.
 
-  const [form, setForm] = useState({ nama_space: '', deskripsi: '', tipe: 'hot_desk', kapasitas: '', harga_per_jam: '', foto: '' })
+  const [form, setForm] = useState({ nama_space: '', deskripsi: '', tipe: 'meeting_room', kapasitas: '', harga_per_jam: '' })
+  const [existingFoto, setExistingFoto] = useState('') // photo currently stored on the space
+  const [newFile, setNewFile] = useState(null)         // File chosen but not uploaded yet
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
 
   const load = async () => {
@@ -29,14 +31,16 @@ export default function SpaceDetail() {
     try {
       const res = await getSpaceById(id)
       const data = unwrap(res).data
-      if (data) setForm({
-        nama_space: data.nama_space || '',
-        deskripsi: data.deskripsi || '',
-        tipe: data.tipe || 'hot_desk',
-        kapasitas: data.kapasitas || '',
-        harga_per_jam: data.harga_per_jam || '',
-        foto: data.foto || ''
-      })
+      if (data) {
+        setForm({
+          nama_space: data.nama_space || '',
+          deskripsi: data.deskripsi || '',
+          tipe: data.tipe || 'meeting_room',
+          kapasitas: data.kapasitas ?? '',
+          harga_per_jam: data.harga_per_jam ?? '',
+        })
+        setExistingFoto(pickSpacePhoto(data))
+      }
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -48,53 +52,50 @@ export default function SpaceDetail() {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const res = await uploadSpaceImage(file)
-      const url = unwrap(res).data?.url
-      if (url) {
-        setForm(prev => ({ ...prev, foto: url }))
-        toast.success('Foto berhasil diunggah')
-      }
-    } catch (err) {
-      toast.error(getErrorMessage(err))
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setSaving(true)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const payload = {
-        ...form,
-        kapasitas: Number(form.kapasitas),
-        harga_per_jam: Number(form.harga_per_jam)
-      }
-      if (isNew) {
-        await createSpace(payload)
-        toast.success('Space berhasil ditambahkan')
-      } else {
-        await updateSpace(id, payload)
-        toast.success('Space berhasil diperbarui')
-      }
-      navigate('/admin/spaces')
-    } catch (err) {
-      toast.error(getErrorMessage(err))
-    } finally {
-      setSaving(false)
+  try {
+    const payload = {
+      nama_space: form.nama_space,
+      deskripsi: form.deskripsi,
+      tipe: form.tipe,
+      kapasitas: Number(form.kapasitas),
+      harga_per_jam: Number(form.harga_per_jam),
     }
-  }
 
+    // Endpoint /api/admin/spaces menerima foto sebagai File
+    if (newFile instanceof File) {
+      payload.foto = newFile
+    }
+
+    console.log('SPACE PAYLOAD:', payload)
+
+    if (isNew) {
+      const createRes = await createSpace(payload)
+
+      console.log('CREATE SPACE RESPONSE:', createRes)
+
+      toast.success('Space berhasil ditambahkan')
+    } else {
+      const updateRes = await updateSpace(id, payload)
+
+      console.log('UPDATE SPACE RESPONSE:', updateRes)
+
+      toast.success('Space berhasil diperbarui')
+    }
+
+    navigate('/admin/spaces')
+  } catch (err) {
+    console.error('SAVE SPACE ERROR:', err)
+    toast.error(getErrorMessage(err))
+  } finally {
+    setSaving(false)
+  }
+}
   if (loading) return <Loading />
   if (error) return <ErrorState message={error} onRetry={load} />
-
-  const photoUrl = getImageUrl(form.foto, 'spaces')
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -112,27 +113,15 @@ export default function SpaceDetail() {
           <div className="p-6 sm:p-8 space-y-8">
             <div className="space-y-4">
               <label className="block text-sm font-medium text-ink">Foto Utama</label>
-              <div className="flex flex-col sm:flex-row gap-6 items-start">
-                <div className="w-full sm:w-64 aspect-video bg-sand rounded-lg overflow-hidden border border-stone/10 relative">
-                  {photoUrl ? (
-                    <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-stone text-sm">Tidak ada foto</div>
-                  )}
-                  {uploading && (
-                    <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center">
-                      <span className="w-6 h-6 border-2 border-forest border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                    Pilih Foto (Maks 2MB)
-                  </Button>
-                  <p className="text-xs text-stone">Format: JPG, PNG. Rasio ideal 16:9.</p>
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
-                </div>
-              </div>
+              <PhotoPicker
+                type="spaces"
+                variant="wide"
+                name={form.nama_space}
+                currentFoto={existingFoto}
+                file={newFile}
+                onChange={setNewFile}
+                disabled={saving}
+              />
             </div>
 
             <div className="border-t border-stone/10 pt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -145,11 +134,9 @@ export default function SpaceDetail() {
                 value={form.tipe}
                 onChange={handleChange}
                 options={[
-                  { value: 'hot_desk', label: 'Hot Desk' },
-                  { value: 'dedicated_desk', label: 'Dedicated Desk' },
                   { value: 'private_office', label: 'Private Office' },
                   { value: 'meeting_room', label: 'Meeting Room' },
-                  { value: 'event_space', label: 'Event Space' },
+                  { value: 'desk', label: 'Desk' },
                 ]}
               />
               <Input label="Kapasitas (Orang)" name="kapasitas" type="number" min={1} value={form.kapasitas} onChange={handleChange} required />
