@@ -80,7 +80,7 @@ export default function HistoryList() {
 
 
   const monthOptions = [
-    { value: '', label: 'Semua Bulan' },
+    { value: '', label: 'Semua' },
     { value: '1', label: 'Januari' }, { value: '2', label: 'Februari' }, { value: '3', label: 'Maret' },
     { value: '4', label: 'April' }, { value: '5', label: 'Mei' }, { value: '6', label: 'Juni' },
     { value: '7', label: 'Juli' }, { value: '8', label: 'Agustus' }, { value: '9', label: 'September' },
@@ -109,7 +109,7 @@ export default function HistoryList() {
   type="number"
   value={filters.year}
   onChange={handleFilterChange}
-  placeholder="Contoh: 2026"
+  placeholder="Contoh"
 />
       </Card>
 
