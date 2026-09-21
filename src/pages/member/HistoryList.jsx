@@ -109,7 +109,7 @@ export default function HistoryList() {
   type="number"
   value={filters.year}
   onChange={handleFilterChange}
-  placeholder="Contoh"
+  placeholder="Contoh : 2026"
 />
       </Card>
 
